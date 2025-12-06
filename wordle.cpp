@@ -1,8 +1,5 @@
 #ifndef RECCHECK
-// For debugging
 #include <iostream>
-// For std::remove
-#include <algorithm> 
 #include <map>
 #include <set>
 #endif
@@ -11,79 +8,84 @@
 #include "dict-eng.h"
 using namespace std;
 
+// helper prototype
+void helper(const string& in,
+            string& current,
+            string floating,
+            int pos,
+            const set<string>& dict,
+            set<string>& results);
 
-// Add prototypes of helper functions here
-void wordleHelper(
-    const string& in,
-    const string& floating,
-    const set<string>& dict,
-    string& current,
-    int pos,
-    set<string>& results);
-
-bool containsAllFloating(const string& word, const string& floating);
-
-
-// Definition of primary wordle function
 std::set<std::string> wordle(
     const std::string& in,
     const std::string& floating,
     const std::set<std::string>& dict)
 {
     set<string> results;
-    string current = in;
-    wordleHelper(in, floating, dict, current, 0, results);
+    string cur = in;
+    helper(in, cur, floating, 0, dict, results);
     return results;
 }
 
-// Define any helper functions here
-void wordleHelper(
-    const string& in,
-    const string& floating,
-    const set<string>& dict,
-    string& current,
-    int pos,
-    set<string>& results)
+void helper(const string& in,
+            string& current,
+            string floating,
+            int pos,
+            const set<string>& dict,
+            set<string>& results)
 {
-    // Base case: if we've filled all positions
-    if(pos == (int)in.length()) {
-        // Check if current word contains all floating characters
-        if(containsAllFloating(current, floating)) {
-            // Check if it's in the dictionary
-            if(dict.find(current) != dict.end()) {
-                results.insert(current);
-            }
+    int n = in.size();
+
+    // Base case: full string formed
+    if(pos == n) {
+
+        // Must use ALL floating letters
+        if(floating.empty() && dict.find(current) != dict.end()) {
+            results.insert(current);
         }
         return;
     }
-    
-    // If current position is fixed (not a dash), move to next position
-    if(in[pos] != '-') {
-        wordleHelper(in, floating, dict, current, pos + 1, results);
-    }
-    else {
-        // Try all 26 lowercase letters at this position
-        for(char c = 'a'; c <= 'z'; c++) {
-            current[pos] = c;
-            wordleHelper(in, floating, dict, current, pos + 1, results);
-        }
-        // Restore dash (backtrack)
-        current[pos] = '-';
-    }
-}
 
-bool containsAllFloating(const string& word, const string& floating) {
-    for(char c : floating) {
-        bool found = false;
-        for(char w : word) {
-            if(w == c) {
-                found = true;
-                break;
-            }
-        }
-        if(!found) {
-            return false;
+    // If fixed letter, skip
+    if(in[pos] != '-') {
+        helper(in, current, floating, pos + 1, dict, results);
+        return;
+    }
+
+    // Count blank slots left
+    int blanksLeft = 0;
+    for(int i = pos; i < n; i++) {
+        if(current[i] == '-') blanksLeft++;
+    }
+
+    // Prune impossible branches: not enough space for floating letters
+    if((int)floating.size() > blanksLeft)
+        return;
+
+    // OPTION 1: place each floating letter here
+    for(int i = 0; i < (int)floating.size(); i++) {
+        char c = floating[i];
+
+        current[pos] = c;
+        string nextFloating = floating;
+        nextFloating.erase(i, 1);  // remove used floating letter
+
+        helper(in, current, nextFloating, pos + 1, dict, results);
+    }
+
+    // OPTION 2: place a non-floating letter *only if*
+    // we still have more blanks than floating letters.
+    if((int)floating.size() < blanksLeft) {
+        for(char c = 'a'; c <= 'z'; c++) {
+            // Don’t place a floating letter here in this branch
+            if(floating.find(c) != string::npos)
+                continue;
+
+            current[pos] = c;
+            helper(in, current, floating, pos + 1, dict, results);
         }
     }
-    return true;
+
+    // restore for safety (not strictly required)
+    current[pos] = '-';
 }
